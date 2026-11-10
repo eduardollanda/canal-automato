@@ -8,20 +8,20 @@ Documento de requisitos para implementar um algoritmo de canal automático que b
 
 ## 1. Objetivo do produto
 
-Criar um **canal automático** que:
+Criar o canal automático **frapfel TV**, focado em **futebol brasileiro** (Brasileirão, clubes, seleções, gols, melhores momentos, análises, bastidores, entrevistas, clássicos, Copa do Brasil e temas afins), que:
 
-1. Seleciona vídeos do YouTube para a programação principal
-2. Monta uma programação sequencial (playlist contínua)
-3. Insere **propagandas no meio** da programação (breaks comerciais)
+1. Seleciona vídeos do YouTube de futebol do Brasil para a programação principal
+2. Monta uma programação sequencial (playlist contínua) com playout 24h
+3. Insere **propagandas no meio** da programação (breaks comerciais tipados, com bias esportivo quando fizer sentido)
 4. Para cada slot comercial: **identifica o tipo**, define a **duração** e **encontra um vídeo equivalente no YouTube**
-5. **Aprende com a interação de views**: quanto mais um tipo de conteúdo é visto, mais esse tipo entra na programação
+5. **Aprende com a interação de views**: quanto mais um tipo editorial (ex.: `gols`, `classico`) é visto, mais esse tipo entra na programação
 6. Garante que **sempre** haja algo passando (sem buraco / tela preta)
 7. Mantém em cache apenas o mínimo necessário para a próxima troca ser instantânea
 8. Apaga o vídeo da memória/disco assim que ele termina de tocar
 9. Nunca ultrapassa **2GB** somando todos os vídeos em cache (conteúdo + propaganda)
 10. Possui **logo oficial do canal** e exibe **marca d'água permanente** no canto inferior direito durante toda a programação
 
-Em essência: um playout linear 24h com identidade visual do canal, grade comercial simplificada, **recomendação por afinidade de views**, prefetch inteligente e orçamento rígido de disco.
+Em essência: um playout linear 24h de **futebol BR** com identidade **frapfel TV**, grade comercial simplificada, **recomendação por afinidade de views**, prefetch inteligente e orçamento rígido de disco.
 
 ---
 
@@ -44,7 +44,7 @@ Este sistema adapta a lógica de programação/playout/grade comercial descrita 
 | Audiência / views | Sinal de afinidade por tipo de conteúdo |
 | Programação por demanda | Source Manager enviesa a fila para tipos mais vistos |
 
-Escopo do produto: **conteúdo contínuo sem delay + propagandas tipadas + feedback de views para reforçar tipos populares**.
+Escopo do produto: **programação contínua de futebol brasileiro sem delay + propagandas tipadas + feedback de views para reforçar tipos editoriais populares**.
 
 ---
 
@@ -210,26 +210,26 @@ Escopo do produto: **conteúdo contínuo sem delay + propagandas tipadas + feedb
 
 ### RF16 — Tipagem de conteúdo (taxonomia)
 - Todo item `content` deve ter um `content_type` antes de entrar na fila (ou no máximo ao iniciar o play).
-- Taxonomia mínima sugerida (configurável):
+- Taxonomia editorial do **frapfel TV** (futebol brasileiro, configurável):
 
 | Código | Tipo de conteúdo |
 |---|---|
-| `music` | Música / clipe |
-| `gaming` | Games / gameplay |
-| `comedy` | Humor |
-| `news` | Notícias / atualidades |
-| `sports` | Esportes |
-| `food` | Culinária / gastronomia |
-| `tech` | Tecnologia |
-| `education` | Educação / tutorial |
-| `lifestyle` | Lifestyle / vlog |
-| `movie_trailer` | Trailers / cinema |
-| `kids` | Infantil |
-| `other` | Não classificado |
+| `gols` | Gols e placas |
+| `melhores_momentos` | Highlights / resumos de jogos |
+| `analise` | Análise tática e comentários pós-jogo |
+| `entrevista` | Entrevistas e coletivas |
+| `bastidores` | Bastidores de clubes e seleção |
+| `classico` | Clássicos e derbies brasileiros |
+| `brasileirao` | Campeonato Brasileiro (Série A / rodadas) |
+| `copa` | Copa do Brasil e competições de mata-mata |
+| `selecao` | Seleção brasileira |
+| `curiosidade` | História, curiosidades e documentários |
+| `other` | Futebol BR genérico / não classificado |
 
+- Buscas YouTube devem priorizar queries em português sobre futebol do Brasil (clubes, Brasileirão, seleção, etc.).
 - Fontes de classificação (em ordem):
   1. tag manual / regra da origem (playlist → tipo)
-  2. palavras-chave do título/descrição/canal
+  2. palavras-chave do título/descrição/canal (taxonomia de futebol BR)
   3. fallback `other`
 
 ### RF17 — Captura de interação de views
@@ -286,8 +286,8 @@ escolher candidato que caiba no cache e não tenha repetido recentemente
 ```
 
 - O mesmo sinal pode **influenciar ads** (opcional, fase 2):
-  - conteúdo `food` em alta → mais chance de `food_beverage` no break
-  - conteúdo `tech` em alta → mais `tech` / `trailer` de games
+  - conteúdo `classico` / `gols` em alta → mais chance de `event` / `food_beverage` no break
+  - conteúdo `brasileirao` / `copa` em alta → mais `event` / `finance` (patrocínio esportivo)
 
 ### RF20 — Persistência e observabilidade da afinidade
 - Persistir `affinity` em disco (JSON/SQLite) entre restarts.
@@ -298,9 +298,9 @@ escolher candidato que caiba no cache e não tenha repetido recentemente
 - Permitir reset manual dos pesos (“esquecer preferências”).
 
 ### RF21 — Logo do canal
-- Deve existir asset oficial de logo do canal no repositório.
-- Nome de marca sugerido na UI: **frapfel TV**.
-- A logo é usada na marca d'água e no chrome da aplicação (header).
+- Deve existir asset oficial de logo do canal no repositório (`assets/logo.jpg`).
+- Nome de marca na UI: **frapfel TV** (canal de futebol brasileiro).
+- A logo é usada na marca d'água e no chrome da aplicação (header), com identidade visual alinhada ao tema esportivo/BR.
 
 ### RF22 — Marca d'água permanente
 - Overlay da logo no **canto inferior direito** do player em todos os itens (`content` e `ad`).
@@ -571,18 +571,18 @@ Princípios:
 
 ### 7.11 Exemplo concreto de decisão (conteúdo + ad + views)
 
-Conteúdo atual: vídeo de culinária (11 min, `content_type=food`). Política: 1 break de ~45s a cada conteúdo. Afinidade atual: `food` alta após várias views.
+Conteúdo atual: resumo de clássico (11 min, `content_type=classico`). Política: 1 break de ~45s a cada conteúdo. Afinidade atual: `classico` alta após várias views.
 
-1. View Tracker registra progresso/complete de `food` → sobe `affinity[food]`
+1. View Tracker registra progresso/complete de `classico` → sobe `affinity[classico]`
 2. Ad Planner define break de 45s
-3. Escolhe tipos: `food_beverage` (30s) + `promo_house` (15s) (enviesado pelo conteúdo quente)
+3. Escolhe tipos: `event` (30s) + `promo_house` (15s) (enviesado pelo conteúdo quente de futebol)
 4. Matcher busca:
-   - query A: `"food commercial 30 seconds"` / `"propaganda comida 30 segundos"`
+   - query A: `"football match promo"` / `"propaganda jogo futebol ingresso"`
    - filtra duração 25–35s, pega melhor score
-   - query B: `"tv channel promo bumper 15 seconds"` (ou usa pinned house)
+   - query B: `"tv sports channel bump promo"` (ou usa pinned house)
 5. Downloader baixa os 2 ads (leves) enquanto o conteúdo ainda roda
 6. Ao fim do conteúdo: toca ad 30s → ad 15s → próximo conteúdo
-7. Source Manager, com `affinity[food]` alto, tende a buscar outro vídeo `food` (respeitando explore/max share)
+7. Source Manager, com `affinity[classico]` alto, tende a buscar outro vídeo `classico` (respeitando explore/max share)
 8. Apaga cada arquivo ao terminar
 
 ---

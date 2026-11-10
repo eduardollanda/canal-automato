@@ -29,51 +29,94 @@ MAX_TYPE_SHARE = float(os.getenv("MAX_TYPE_SHARE", "0.55"))
 PLAYBACK_MODE = os.getenv("PLAYBACK_MODE", "embed")
 CHANNEL_NAME = os.getenv("CHANNEL_NAME", "frapfel TV")
 
+# Editorial: futebol brasileiro (Brasileirão, clubes, seleções, gols, análises).
 CONTENT_TYPES = [
-    "music",
-    "gaming",
-    "comedy",
-    "news",
-    "sports",
-    "food",
-    "tech",
-    "education",
-    "lifestyle",
-    "movie_trailer",
-    "kids",
+    "gols",
+    "melhores_momentos",
+    "analise",
+    "entrevista",
+    "bastidores",
+    "classico",
+    "brasileirao",
+    "copa",
+    "selecao",
+    "curiosidade",
     "other",
 ]
 
 CONTENT_TYPE_QUERIES = {
-    "music": ["official music video", "clipe oficial musica"],
-    "gaming": ["gameplay highlights", "gameplay ao vivo curto"],
-    "comedy": ["standup comedy short", "sketch comedy"],
-    "news": ["world news today", "noticias do dia"],
-    "sports": ["sports highlights", "melhores momentos futebol"],
-    "food": ["easy recipe short", "receita rapida"],
-    "tech": ["tech review short", "unboxing tecnologia"],
-    "education": ["science explained short", "tutorial educativo"],
-    "lifestyle": ["day in the life vlog", "lifestyle vlog"],
-    "movie_trailer": ["official movie trailer", "trailer oficial filme"],
-    "kids": ["kids cartoon short", "desenho infantil curto"],
-    "other": ["interesting short video", "video interessante curto"],
+    "gols": [
+        "gols brasileirão 2024",
+        "melhores gols futebol brasileiro",
+        "gols flamengo palmeiras corinthians",
+    ],
+    "melhores_momentos": [
+        "melhores momentos brasileirão",
+        "highlights futebol brasil",
+        "melhores momentos campeonato brasileiro",
+    ],
+    "analise": [
+        "análise tática futebol brasileiro",
+        "comentários pós jogo brasileirão",
+        "análise rodada campeonato brasileiro",
+    ],
+    "entrevista": [
+        "entrevista jogador futebol brasileiro",
+        "coletiva técnico brasileirão",
+        "entrevista craque futebol brasil",
+    ],
+    "bastidores": [
+        "bastidores clube futebol brasil",
+        "making of futebol brasileiro",
+        "bastidores seleção brasileira",
+    ],
+    "classico": [
+        "clássico futebol brasileiro gols",
+        "flamengo fluminense clássico",
+        "corinthians palmeiras clássico",
+        "grêmio internacional clássico",
+    ],
+    "brasileirao": [
+        "campeonato brasileiro série a",
+        "brasileirão rodada resumo",
+        "tabela brasileirão análise",
+    ],
+    "copa": [
+        "copa do brasil gols",
+        "copa do brasil melhores momentos",
+        "final copa do brasil",
+    ],
+    "selecao": [
+        "seleção brasileira gols",
+        "brasil seleção melhores momentos",
+        "amigável seleção brasileira",
+    ],
+    "curiosidade": [
+        "curiosidades futebol brasileiro",
+        "história clubes brasileiros",
+        "documentário futebol brasil",
+    ],
+    "other": [
+        "futebol brasileiro youtube",
+        "esporte futebol brasil highlights",
+    ],
 }
 
 AD_TYPE_QUERIES = {
     "spot_15": ["15 second commercial", "propaganda 15 segundos"],
-    "spot_30": ["30 second tv commercial", "propaganda 30 segundos"],
+    "spot_30": ["30 second tv commercial", "propaganda 30 segundos futebol"],
     "spot_60": ["60 second commercial", "filme publicitario 1 minuto"],
-    "retail": ["retail store commercial", "propaganda oferta loja"],
-    "food_beverage": ["food commercial 30 seconds", "propaganda comida bebida"],
+    "retail": ["sportswear commercial", "propaganda loja esporte nike adidas"],
+    "food_beverage": ["beer commercial soccer", "propaganda cerveja futebol"],
     "tech": ["tech gadget commercial", "propaganda celular tecnologia"],
     "auto": ["car commercial 30 seconds", "propaganda carro"],
-    "finance": ["bank commercial", "propaganda banco cartao"],
+    "finance": ["bank commercial sports", "propaganda banco patrocinio futebol"],
     "beauty": ["beauty product ad", "propaganda cosmetico"],
-    "trailer": ["movie trailer 60 seconds", "trailer oficial curto"],
-    "event": ["event promo commercial", "propaganda show evento"],
+    "trailer": ["sports documentary trailer", "trailer documentario futebol"],
+    "event": ["football match promo", "propaganda jogo futebol ingresso"],
     "public_service": ["public service announcement", "campanha utilidade publica"],
-    "promo_house": ["tv channel bump promo", "vinheta canal tv"],
-    "generic_brand": ["brand commercial ad", "propaganda marca"],
+    "promo_house": ["tv sports channel bump promo", "vinheta canal esporte futebol"],
+    "generic_brand": ["brand commercial sports", "propaganda marca esporte"],
 }
 
 AD_DURATION_WINDOWS = {
@@ -94,22 +137,26 @@ AD_DURATION_WINDOWS = {
 }
 
 CONTENT_AD_BIAS = {
-    "food": ["food_beverage", "retail"],
-    "tech": ["tech", "trailer"],
-    "gaming": ["tech", "trailer", "event"],
-    "sports": ["event", "retail", "spot_30"],
-    "music": ["event", "spot_30", "generic_brand"],
-    "movie_trailer": ["trailer", "spot_30"],
-    "kids": ["promo_house", "generic_brand"],
+    "gols": ["event", "spot_30", "food_beverage"],
+    "melhores_momentos": ["event", "retail", "spot_30"],
+    "analise": ["finance", "spot_30", "generic_brand"],
+    "entrevista": ["spot_30", "retail", "promo_house"],
+    "bastidores": ["promo_house", "event", "spot_30"],
+    "classico": ["event", "food_beverage", "retail"],
+    "brasileirao": ["event", "finance", "spot_30"],
+    "copa": ["event", "trailer", "spot_30"],
+    "selecao": ["event", "retail", "food_beverage"],
+    "curiosidade": ["trailer", "promo_house", "generic_brand"],
+    "other": ["event", "spot_30", "generic_brand"],
 }
 
-# Seeds estáveis (Creative Commons / oficiais comuns) para bootstrap offline de busca.
+# Seeds estáveis para bootstrap quando a busca YouTube falha.
 FALLBACK_SEEDS = [
-    {"video_id": "jNQXAC9IVRw", "title": "Me at the zoo", "duration": 19, "content_type": "other"},
-    {"video_id": "aqz-KE-bpKQ", "title": "Big Buck Bunny", "duration": 596, "content_type": "kids"},
-    {"video_id": "LXb3EKWsInQ", "title": "Costa Rica in 4K", "duration": 303, "content_type": "lifestyle"},
-    {"video_id": "ScMzIvxBSi4", "title": "Relaxing Music", "duration": 180, "content_type": "music"},
-    {"video_id": "Rk6_hdRtJOE", "title": "Football Skills", "duration": 240, "content_type": "sports"},
+    {"video_id": "Rk6_hdRtJOE", "title": "Football Skills", "duration": 240, "content_type": "melhores_momentos"},
+    {"video_id": "jNQXAC9IVRw", "title": "Me at the zoo (fill curto)", "duration": 19, "content_type": "other"},
+    {"video_id": "aqz-KE-bpKQ", "title": "Big Buck Bunny (fill)", "duration": 596, "content_type": "other"},
+    {"video_id": "LXb3EKWsInQ", "title": "Costa Rica in 4K (fill)", "duration": 303, "content_type": "curiosidade"},
+    {"video_id": "ScMzIvxBSi4", "title": "Relaxing Music (fill)", "duration": 180, "content_type": "bastidores"},
 ]
 
 
