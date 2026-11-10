@@ -2,7 +2,7 @@
 
 ## Canal Automático com Vídeos do YouTube (Cache ≤ 2GB)
 
-Documento de requisitos para implementar um algoritmo de canal automático que baixa vídeos do YouTube, monta a programação em sequência contínua **com breaks de propaganda**, identifica tipo e duração de cada comercial, busca um equivalente no YouTube, garante que sempre haja conteúdo no ar, calcula o cache mínimo necessário para troca sem delay e respeita o limite de **2GB** de armazenamento da máquina.
+Documento de requisitos para implementar um algoritmo de canal automático que baixa vídeos do YouTube, monta a programação em sequência contínua **com breaks de propaganda**, identifica tipo e duração de cada comercial, busca um equivalente no YouTube, **aprende com as views** para entregar mais do tipo de conteúdo mais assistido, garante que sempre haja conteúdo no ar, calcula o cache mínimo necessário para troca sem delay e respeita o limite de **2GB** de armazenamento da máquina.
 
 ---
 
@@ -14,12 +14,14 @@ Criar um **canal automático** que:
 2. Monta uma programação sequencial (playlist contínua)
 3. Insere **propagandas no meio** da programação (breaks comerciais)
 4. Para cada slot comercial: **identifica o tipo**, define a **duração** e **encontra um vídeo equivalente no YouTube**
-5. Garante que **sempre** haja algo passando (sem buraco / tela preta)
-6. Mantém em cache apenas o mínimo necessário para a próxima troca ser instantânea
-7. Apaga o vídeo da memória/disco assim que ele termina de tocar
-8. Nunca ultrapassa **2GB** somando todos os vídeos em cache (conteúdo + propaganda)
+5. **Aprende com a interação de views**: quanto mais um tipo de conteúdo é visto, mais esse tipo entra na programação
+6. Garante que **sempre** haja algo passando (sem buraco / tela preta)
+7. Mantém em cache apenas o mínimo necessário para a próxima troca ser instantânea
+8. Apaga o vídeo da memória/disco assim que ele termina de tocar
+9. Nunca ultrapassa **2GB** somando todos os vídeos em cache (conteúdo + propaganda)
+10. Possui **logo oficial do canal** e exibe **marca d'água permanente** no canto inferior direito durante toda a programação
 
-Em essência: um playout linear 24h com grade comercial simplificada, prefetch inteligente e orçamento rígido de disco.
+Em essência: um playout linear 24h com identidade visual do canal, grade comercial simplificada, **recomendação por afinidade de views**, prefetch inteligente e orçamento rígido de disco.
 
 ---
 
@@ -39,8 +41,10 @@ Este sistema adapta a lógica de programação/playout/grade comercial descrita 
 | Inventário limitado | Orçamento de disco = 2GB |
 | Fill | Vídeo reserva / fallback sempre disponível |
 | Scheduler de prefetch | Decide o que baixar e quando apagar |
+| Audiência / views | Sinal de afinidade por tipo de conteúdo |
+| Programação por demanda | Source Manager enviesa a fila para tipos mais vistos |
 
-Escopo do produto: **conteúdo contínuo sem delay + propagandas tipadas buscadas no YouTube**.
+Escopo do produto: **conteúdo contínuo sem delay + propagandas tipadas + feedback de views para reforçar tipos populares**.
 
 ---
 
@@ -71,13 +75,29 @@ Escopo do produto: **conteúdo contínuo sem delay + propagandas tipadas buscada
 - O canal deve inserir breaks comerciais conforme a política de grade.
 - Cada propaganda precisa ter: **tipo identificado**, **duração alvo** e **match no YouTube**.
 
+### R8 — Feedback de views na seleção de conteúdo
+- O algoritmo deve se alimentar das views/interações.
+- Tipos de conteúdo com mais views efetivas devem receber **maior probabilidade** de entrar na programação seguinte.
+- Deve haver freio de exploração para não travar 100% em um único tipo.
+
+### R9 — Identidade visual (logo + marca d'água)
+- O canal deve ter uma **logo oficial** criada e versionada no projeto (`assets/logo.png` ou equivalente).
+- Durante **toda** a programação (conteúdo e propaganda), a logo deve aparecer como **marca d'água fixa no canto inferior direito**.
+- A marca d'água não pode bloquear controles essenciais do player de forma permanente, mas deve permanecer visível o tempo todo.
+- Opacidade sugerida: 55–80%; tamanho responsivo (ex.: ~8–12% da largura do player no desktop).
+- A logo também deve aparecer na UI do canal (cabeçalho / painel do algoritmo).
+
 ---
 
 ## 4. Atores e componentes
 
 | Componente | Responsabilidade |
 |---|---|
-| **Source Manager** | Descobre/seleciona próximos vídeos de conteúdo no YouTube |
+| **Source Manager** | Descobre/seleciona próximos vídeos de conteúdo no YouTube (enviesado pelos pesos de afinidade) |
+| **Content Taxonomy** | Classifica cada conteúdo em um ou mais `content_type` |
+| **View Tracker** | Captura eventos de view/interação e atribui ao tipo de conteúdo |
+| **Affinity Engine** | Atualiza pesos por tipo (“quanto mais visto, mais entregar”) |
+| **Brand Overlay** | Exibe logo/marca d'água no canto inferior direito em todo o playout |
 | **Ad Planner (Tráfego)** | Decide onde entra break, tipo de propaganda e duração do slot |
 | **Ad Matcher** | Busca no YouTube um vídeo equivalente ao tipo+duração pedidos |
 | **Downloader** | Baixa o arquivo (conteúdo ou ad) para cache local |
@@ -86,7 +106,7 @@ Escopo do produto: **conteúdo contínuo sem delay + propagandas tipadas buscada
 | **Playout Engine** | Toca o item atual e faz handoff para o próximo |
 | **Program Queue** | Fila lógica misturando `content` e `ad` |
 | **Fallback Pack** | Conteúdo/ad reserva se download falhar |
-| **As-run Logger** | Registra o que foi ao ar, tipo (programa/ad), erros e cache |
+| **As-run Logger** | Registra o que foi ao ar, tipo (programa/ad), views e cache |
 
 ---
 
@@ -95,6 +115,7 @@ Escopo do produto: **conteúdo contínuo sem delay + propagandas tipadas buscada
 ### RF01 — Montagem da programação
 - O sistema deve manter uma **fila de programação** com itens ordenados.
 - Cada item contém no mínimo: `kind` (`content` | `ad`), `video_id`, `titulo`, `duracao_estimada`, `tamanho_estimado`, `status`, `prioridade`.
+- Itens `content` contêm ainda: `content_type` (categoria principal) e opcionalmente `content_tags[]`.
 - Itens `ad` contêm ainda: `ad_type`, `target_duration_sec`, `matched_query`, `match_score`.
 - Status sugeridos: `planned` → `matching` → `downloading` → `ready` → `playing` → `played` → `deleted` (ou `failed`).
 
@@ -186,6 +207,105 @@ Escopo do produto: **conteúdo contínuo sem delay + propagandas tipadas buscada
 - Ads entram na mesma fila de prefetch que conteúdo.
 - Prioridade de prontidão: se o próximo item da timeline for `ad`, ele precisa estar `ready` com a mesma regra anti-delay.
 - Ads tendem a ser curtos/leves → preferir baixá-los cedo, pois ajudam a manter o handoff sem ocupar muito dos 2GB.
+
+### RF16 — Tipagem de conteúdo (taxonomia)
+- Todo item `content` deve ter um `content_type` antes de entrar na fila (ou no máximo ao iniciar o play).
+- Taxonomia mínima sugerida (configurável):
+
+| Código | Tipo de conteúdo |
+|---|---|
+| `music` | Música / clipe |
+| `gaming` | Games / gameplay |
+| `comedy` | Humor |
+| `news` | Notícias / atualidades |
+| `sports` | Esportes |
+| `food` | Culinária / gastronomia |
+| `tech` | Tecnologia |
+| `education` | Educação / tutorial |
+| `lifestyle` | Lifestyle / vlog |
+| `movie_trailer` | Trailers / cinema |
+| `kids` | Infantil |
+| `other` | Não classificado |
+
+- Fontes de classificação (em ordem):
+  1. tag manual / regra da origem (playlist → tipo)
+  2. palavras-chave do título/descrição/canal
+  3. fallback `other`
+
+### RF17 — Captura de interação de views
+- O sistema deve registrar eventos de view por conteúdo exibido.
+- Eventos mínimos:
+  - `view_start` — começou a tocar
+  - `view_progress` — marcos (25%, 50%, 75%)
+  - `view_complete` — chegou ao fim (ou ≥ `completion_threshold`, ex.: 90%)
+  - `view_skip` / `view_abandon` — saiu cedo (se houver controle remoto/UI; no canal linear puro, abandon pode ser N/A)
+- Cada evento carrega: `video_id`, `content_type`, `watched_sec`, `watched_ratio`, `timestamp`
+- No MVP linear sem app de usuário, **view = exibição no ar** (as-run + completion).  
+  Quando houver player com audiência mensurável (web/app), views reais do espectador substituem/somam a esse sinal.
+
+### RF18 — Score de afinidade por tipo (“mais visto → mais entregar”)
+- Manter um vetor de pesos `affinity[content_type]`.
+- A cada view válida, atualizar o peso do tipo correspondente.
+- Fórmula sugerida (simples e testável):
+
+```text
+signal = watched_ratio                    # 0..1
+se watched_ratio >= completion_threshold:
+  signal += bonus_complete                # ex.: +0.5
+
+affinity[type] =
+  affinity[type] * decay                  # ex.: 0.995 por ciclo/hora
+  + learning_rate * signal                # ex.: 0.2 * signal
+
+# normalizar periodicamente para soma = 1 (ou softmax)
+```
+
+- Regra de negócio central:
+  - **quanto maior `affinity[type]`, maior a chance desse tipo ser escolhido** no próximo enfileiramento de conteúdo.
+- Deve existir:
+  - `min_explore_ratio` (ex.: 15–20%) para tipos fracos/aleatórios — evita monocultura
+  - `max_type_share` (ex.: 50–60%) — nenhum tipo domina totalmente a grade
+  - `decay` temporal — views antigas pesam menos que views recentes
+
+### RF19 — Seleção de próximo conteúdo enviesada por afinidade
+- Ao completar a fila, o Source Manager:
+  1. amostra um `content_type` com probabilidade ∝ `affinity[type]` (com exploração)
+  2. busca no YouTube candidatos desse tipo
+  3. aplica filtros de cache (tamanho ≤ espaço livre)
+  4. enfileira o escolhido
+- Pseudoseleção:
+
+```text
+se random() < min_explore_ratio:
+  tipo = random_type()
+senão:
+  tipo = weighted_sample(affinity)
+
+candidatos = youtube_search_by_type(tipo)
+escolher candidato que caiba no cache e não tenha repetido recentemente
+```
+
+- O mesmo sinal pode **influenciar ads** (opcional, fase 2):
+  - conteúdo `food` em alta → mais chance de `food_beverage` no break
+  - conteúdo `tech` em alta → mais `tech` / `trailer` de games
+
+### RF20 — Persistência e observabilidade da afinidade
+- Persistir `affinity` em disco (JSON/SQLite) entre restarts.
+- Expor no log/métricas:
+  - top tipos por peso
+  - views por tipo na última hora/dia
+  - % da grade entregue por tipo vs % de afinidade (calibração)
+- Permitir reset manual dos pesos (“esquecer preferências”).
+
+### RF21 — Logo do canal
+- Deve existir asset oficial de logo do canal no repositório.
+- Nome de marca sugerido na UI: **Canal Automato**.
+- A logo é usada na marca d'água e no chrome da aplicação (header).
+
+### RF22 — Marca d'água permanente
+- Overlay da logo no **canto inferior direito** do player em todos os itens (`content` e `ad`).
+- Visível do início ao fim de cada vídeo, inclusive em handoff.
+- Não deve ser removida por troca de item; faz parte do layer fixo da UI de playout.
 
 ### RF03 — Garantia de continuidade (“sempre algo passando”)
 - Enquanto o canal estiver `ON`, deve existir:
@@ -409,19 +529,61 @@ Regras extras do matcher:
 3. Contar o ad no mesmo orçamento de 2GB
 4. Como ads são pequenos, podem ficar `ready` com prioridade alta sem pressionar o disco
 
-### 7.10 Exemplo concreto de decisão
+### 7.10 Algoritmo de afinidade por views (mais visto → mais entregar)
 
-Conteúdo atual: vídeo de culinária (11 min). Política: 1 break de ~45s a cada conteúdo.
+```text
+estado persistente:
+  affinity[type]   # pesos >= 0, preferencialmente normalizados
+  view_stats[type] # contagem, watched_sec, completes
 
-1. Ad Planner define break de 45s
-2. Escolhe tipos: `food_beverage` (30s) + `promo_house` (15s)
-3. Matcher busca:
+on_view_event(video, watched_ratio):
+  type = video.content_type
+  signal = watched_ratio
+  if watched_ratio >= completion_threshold:
+    signal += bonus_complete
+
+  affinity[type] = affinity[type] * decay + learning_rate * signal
+  clamp/normalize(affinity)
+  persist(affinity)
+
+pick_next_content_type():
+  if random() < min_explore_ratio:
+    return random_eligible_type()
+  type = weighted_sample(affinity)
+  if share(type) already >= max_type_share in recent window:
+    return next_best_type(affinity)
+  return type
+
+enqueue_next_content():
+  type = pick_next_content_type()
+  candidates = youtube_search(type)
+  choose first that fits 2GB policy and anti-repeat
+  enqueue(kind=content, content_type=type, ...)
+```
+
+Princípios:
+
+1. **Reforço positivo:** completar/assistir muito sobe o peso do tipo
+2. **Decaimento:** sem views novas, o peso cai aos poucos
+3. **Exploração mínima:** sempre testa outros tipos
+4. **Teto por tipo:** evita canal monotemático
+5. **Mesmo orçamento 2GB:** afinidade só escolhe *o quê* buscar; o cache continua mandando no *quanto* guardar
+
+### 7.11 Exemplo concreto de decisão (conteúdo + ad + views)
+
+Conteúdo atual: vídeo de culinária (11 min, `content_type=food`). Política: 1 break de ~45s a cada conteúdo. Afinidade atual: `food` alta após várias views.
+
+1. View Tracker registra progresso/complete de `food` → sobe `affinity[food]`
+2. Ad Planner define break de 45s
+3. Escolhe tipos: `food_beverage` (30s) + `promo_house` (15s) (enviesado pelo conteúdo quente)
+4. Matcher busca:
    - query A: `"food commercial 30 seconds"` / `"propaganda comida 30 segundos"`
    - filtra duração 25–35s, pega melhor score
    - query B: `"tv channel promo bumper 15 seconds"` (ou usa pinned house)
-4. Downloader baixa os 2 ads (leves) enquanto o conteúdo ainda roda
-5. Ao fim do conteúdo: toca ad 30s → ad 15s → próximo conteúdo
-6. Apaga cada arquivo ao terminar
+5. Downloader baixa os 2 ads (leves) enquanto o conteúdo ainda roda
+6. Ao fim do conteúdo: toca ad 30s → ad 15s → próximo conteúdo
+7. Source Manager, com `affinity[food]` alto, tende a buscar outro vídeo `food` (respeitando explore/max share)
+8. Apaga cada arquivo ao terminar
 
 ---
 
@@ -555,15 +717,26 @@ onDownloadFail(C):
 - `ad_duration_windows` (alvo + min/max por tipo)
 - `ad_match_score_threshold`
 - `ad_no_repeat_window_hours`
+- `content_types` / `content_type_queries`
+- `affinity_learning_rate`
+- `affinity_decay`
+- `completion_threshold` (ex.: 0.9)
+- `bonus_complete`
+- `min_explore_ratio` (ex.: 0.2)
+- `max_type_share` (ex.: 0.55)
+- `ads_follow_content_affinity` (bool, default false no MVP / true na fase 2)
 
 ### 10.2 Estado runtime
 - fila (ordered list de content/ad)
 - item atual
 - uso de disco atual
-- métricas: underruns, fallback_hits, downloads_failed, ad_match_hits, ad_match_misses
+- `affinity` por `content_type`
+- `view_stats` por tipo
+- métricas: underruns, fallback_hits, downloads_failed, ad_match_hits, ad_match_misses, views_by_type, delivery_share_by_type
 
 ### 10.3 As-run
-- `video_id`, `kind`, `ad_type?`, `target_duration_sec?`, `actual_duration_sec`
+- `video_id`, `kind`, `content_type?`, `ad_type?`, `target_duration_sec?`, `actual_duration_sec`
+- `watched_sec`, `watched_ratio`, `completed` (bool)
 - `started_at`, `ended_at`, `bytes`, `source`, `match_score?`, `was_fallback`
 
 ---
@@ -583,6 +756,12 @@ O algoritmo/MVP será aceito quando:
 9. Cada ad exibido tem `ad_type` + duração alvo identificados no as-run
 10. O sistema encontra no YouTube um equivalente aceitável (ou cai no fallback de ad) para o tipo/duração pedidos
 11. Não repete o mesmo ad dentro da janela configurada
+12. Cada conteúdo exibido tem `content_type` e gera evento de view
+13. Após N views concentradas em um tipo, a taxa de entrega desse tipo sobe de forma mensurável
+14. Mesmo com um tipo dominante, a grade respeita `min_explore_ratio` e `max_type_share`
+15. Pesos de afinidade sobrevivem a restart do processo
+16. Logo oficial existe no projeto e aparece na UI
+17. Marca d'água da logo permanece no canto inferior direito durante toda a programação
 
 ---
 
@@ -592,9 +771,10 @@ O algoritmo/MVP será aceito quando:
 - Make-good comercial financeiro
 - Janelas nacional × afiliada
 - UI complexa de tráfego
-- Personalização por usuário
+- Personalização multi-usuário sofisticada (MVP: afinidade global do canal; por usuário só se houver identidade)
 - Multi-região SSAI
 - Detecção automática de marca via visão computacional (pode ser fase futura)
+- Classificação de conteúdo por modelo de ML pesado (MVP: regras/keywords; ML opcional depois)
 - Corte fino frame-a-frame do ad para duração exata (MVP aceita janela de tolerância)
 - Transcodificação pesada local (evitar; preferir baixar já no tamanho certo)
 
@@ -703,11 +883,21 @@ Podem ser fases posteriores, reaproveitando os conceitos do documento de program
 
 **Entrega:** para cada slot, o sistema identifica tipo/tempo e acha um equivalente no YouTube.
 
-### Fase 9 — Endurecimento
+### Fase 9 — Afinidade por views
+1. Taxonomia `content_type` + classificação por keywords/origem
+2. View Tracker (start/progress/complete) ligado ao playout/as-run
+3. Affinity Engine (learning_rate, decay, normalize)
+4. Source Manager com amostragem ponderada + explore/max share
+5. Persistência de `affinity` e métricas delivery vs affinity
+6. (Opcional) ads enviesados pelo tipo de conteúdo quente
+
+**Entrega:** quanto mais um tipo é visto, mais ele aparece na programação — com freios de exploração.
+
+### Fase 10 — Endurecimento
 1. Assert contínuo do teto 2GB
-2. Testes de longa duração com breaks ativos
-3. Ajuste fino de margem temporal, qualidade e queries de ads
-4. Documentação de operação (start/stop/config/tipos de propaganda)
+2. Testes de longa duração com breaks + afinidade ativos
+3. Ajuste fino de margem temporal, qualidade, queries e hiperparâmetros de affinity
+4. Documentação de operação (start/stop/config/tipos/reset de afinidade)
 
 **Entrega:** versão estável para subir na máquina alvo.
 
@@ -722,7 +912,7 @@ MARGIN_SEC = 20
 
 function plan_break(budget_sec):
   while budget_sec > 0:
-    tipo = pick_ad_type()
+    tipo = pick_ad_type(affinity)            # pode seguir content quente
     alvo = target_duration(tipo)
     if alvo > budget_sec: break
     match = youtube_find_equivalent(tipo, alvo)
@@ -732,6 +922,11 @@ function plan_break(budget_sec):
     else:
       enqueue(ad_fallback_or_promo_house())
       break
+
+function enqueue_next_content():
+  content_type = pick_next_content_type(affinity)  # RF18/RF19
+  video = youtube_search_by_type(content_type)
+  enqueue(kind=content, content_type=content_type, video=video)
 
 loop forever:
   ensure_content_and_breaks_planned()
@@ -753,11 +948,15 @@ loop forever:
         if candidato: download(candidato)
         else: arm_fallback()
 
-  on_ended(atual):
+  on_progress/on_ended(atual):
+    if atual.kind == content:
+      record_view(atual)                 # alimenta affinity
+      update_affinity(atual.content_type, watched_ratio)
     prox = first_ready_or_fallback()
-    play(prox)                     # imediato
-    delete_file(atual)             # se não pinned
-    enqueue_more_plans_if_needed() # conteúdo + possíveis ads
+    if event == ended:
+      play(prox)                         # imediato
+      delete_file(atual)                 # se não pinned
+      enqueue_more_plans_if_needed()     # content enviesado + ads
 ```
 
 ---
@@ -778,7 +977,11 @@ loop forever:
 - [ ] 12. Ad Matcher: buscar equivalente no YouTube
 - [ ] 13. Score/limiar + anti-repetição de ads
 - [ ] 14. As-run com tipo/duração de propaganda
-- [ ] 15. Teste de 1h+ com ads e assert de disco
+- [ ] 15. Taxonomia `content_type` + classificação
+- [ ] 16. View Tracker + Affinity Engine
+- [ ] 17. Seleção ponderada (explore + max share)
+- [ ] 18. Persistência/reset de afinidade
+- [ ] 19. Teste de 1h+ com ads, views e assert de disco
 
 ---
 
@@ -793,8 +996,10 @@ loop forever:
 7. **Ads curtos e leves** — facilitam caber no teto e ficarem ready a tempo.
 8. **Tipo + duração antes do download** — só busca/baixa propaganda depois de classificar o slot.
 9. **Equivalência por busca tipada no YouTube** — não depende de anunciante real no MVP.
+10. **Afinidade guia a busca, não o cache** — views escolhem o tipo; 2GB continua limitando quantos arquivos ficam prontos.
+11. **Exploração mínima obrigatória** — evita loop eterno no mesmo tipo.
 
-Com isso, o canal se comporta como playout automático de TV com grade comercial simplificada, inventário físico limitado a 2GB e política agressiva de evicção.
+Com isso, o canal se comporta como playout automático de TV com grade comercial simplificada, recomendação por views, inventário físico limitado a 2GB e política agressiva de evicção.
 
 ---
 
@@ -828,4 +1033,5 @@ Implementar na ordem:
 1. **Fases 0–3** — base do canal contínuo com teto 2GB  
 2. **Fases 4–6** — prefetch + resiliência + autopreenchimento  
 3. **Fases 7–8** — propagandas com tipo/duração + busca de equivalente no YouTube  
-4. **Fase 9** — endurecimento na máquina alvo
+4. **Fase 9** — afinidade por views (mais visto → mais entregar)  
+5. **Fase 10** — endurecimento na máquina alvo

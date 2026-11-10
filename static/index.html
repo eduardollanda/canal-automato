@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canal Automato</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <img src="/assets/logo.jpg" alt="Logo Canal Automato" />
+    <div>
+      <h1>Canal Automato</h1>
+      <p>Playout ao vivo · afinidade por views · cache ≤ 2GB · marca d'água ativa</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="player-shell">
+        <div id="player"></div>
+        <img class="watermark" src="/assets/logo.jpg" alt="" aria-hidden="true" />
+      </div>
+      <div class="now">
+        <div id="kindBadge" class="badge live">no ar</div>
+        <div id="nowTitle" class="meta-title">Carregando programação…</div>
+        <div id="nowSub" class="meta-sub">aguardando engine</div>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="stat"><div class="label">Cache</div><div class="value" id="cacheStat">—</div></div>
+        <div class="stat"><div class="label">Status</div><div class="value" id="statusStat">—</div></div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2>Afinidade por tipo</h2>
+      <div class="bars" id="affinityBars"></div>
+
+      <h2>Fila / prefetch</h2>
+      <ul class="queue" id="queueList"></ul>
+
+      <h2 style="margin-top:14px">Algoritmo (ao vivo)</h2>
+      <ul class="logs" id="logList"></ul>
+
+      <h2 style="margin-top:14px">As-run</h2>
+      <ul class="asrun" id="asrunList"></ul>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+data/cache/
+data/state.json
+data/*.part
+.DS_Store
+*.log
+.railway/
+node_modules/
