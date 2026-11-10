@@ -607,7 +607,7 @@ As-run comprova e alimenta cobrança + make-good
 
 ## 8. Próximos passos possíveis (implementação)
 
-A partir deste documento, os desdobramentos naturais para o projeto **Canal automato** são:
+A partir deste documento, os desdobramentos naturais para o projeto **frapfel TV** são:
 
 1. Modelar o **banco de dados** (tabelas/campos) a partir da seção 5.2
 2. Especificar uma **API de scheduler/tráfego**

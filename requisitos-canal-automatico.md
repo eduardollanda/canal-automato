@@ -299,7 +299,7 @@ escolher candidato que caiba no cache e não tenha repetido recentemente
 
 ### RF21 — Logo do canal
 - Deve existir asset oficial de logo do canal no repositório.
-- Nome de marca sugerido na UI: **Canal Automato**.
+- Nome de marca sugerido na UI: **frapfel TV**.
 - A logo é usada na marca d'água e no chrome da aplicação (header).
 
 ### RF22 — Marca d'água permanente

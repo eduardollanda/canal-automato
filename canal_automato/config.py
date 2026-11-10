@@ -27,7 +27,7 @@ MAX_TYPE_SHARE = float(os.getenv("MAX_TYPE_SHARE", "0.55"))
 
 # embed = YouTube no browser (sem baixar vídeo no disco). Ideal para Railway.
 PLAYBACK_MODE = os.getenv("PLAYBACK_MODE", "embed")
-CHANNEL_NAME = os.getenv("CHANNEL_NAME", "Canal Automato")
+CHANNEL_NAME = os.getenv("CHANNEL_NAME", "frapfel TV")
 
 CONTENT_TYPES = [
     "music",
