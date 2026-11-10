@@ -16,11 +16,13 @@ from .config import (
     CACHE_LIMIT_BYTES,
     CHANNEL_NAME,
     CONTENT_AD_BIAS,
+    HISTORY_PATH,
     MAX_READY_AHEAD,
     PLAYBACK_MODE,
     STATE_PATH,
     ensure_dirs,
 )
+from .history_store import VideoHistory
 from .models import EngineSnapshot, ItemKind, ItemStatus, ProgramItem
 from .youtube_source import find_ad, find_content
 
@@ -36,6 +38,7 @@ class ChannelEngine:
         ensure_dirs()
         self.affinity = AffinityEngine()
         self.cache = CacheManager()
+        self.history = VideoHistory(HISTORY_PATH)
         self.queue: list[ProgramItem] = []
         self.current: Optional[ProgramItem] = None
         self.as_run: list[dict[str, Any]] = []
@@ -55,12 +58,15 @@ class ChannelEngine:
 
     def _load_state(self) -> None:
         if not STATE_PATH.exists():
+            self.log(f"histórico anti-repetição: {self.history.count()} vídeos")
             return
         try:
             data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
             self.affinity.load(data.get("affinity") or {})
             self.content_since_break = int(data.get("content_since_break") or 0)
-            self.log("estado de afinidade restaurado")
+            self.log(
+                f"estado restaurado · histórico anti-repetição: {self.history.count()} vídeos"
+            )
         except Exception as exc:
             self.log(f"falha ao carregar estado: {exc}")
 
@@ -68,9 +74,14 @@ class ChannelEngine:
         payload = {
             "affinity": self.affinity.dump(),
             "content_since_break": self.content_since_break,
+            "history_count": self.history.count(),
             "saved_at": _now(),
         }
         STATE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        try:
+            self.history.save()
+        except Exception as exc:
+            self.log(f"falha ao salvar histórico: {exc}")
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -101,10 +112,11 @@ class ChannelEngine:
                 algorithm_log=list(self.logs[-40:]),
                 content_since_break=self.content_since_break,
                 status=self.status,
+                history_count=self.history.count(),
             )
 
     def _active_ids(self) -> set[str]:
-        ids = set()
+        ids = set(self.history.seen_ids())
         if self.current and self.current.video_id:
             ids.add(self.current.video_id)
         for item in self.queue:
@@ -120,6 +132,10 @@ class ChannelEngine:
         self.log(f"selecionando conteúdo: {reason}")
         found = find_content(ctype, exclude_ids=self._active_ids())
         assert found
+        if found.get("is_repeat_last_resort"):
+            self.log("aviso: conteúdo last-resort (sem novidade disponível)")
+        elif found.get("search_expanded"):
+            self.log(f"busca expandida → {found.get('content_type')} / {found.get('matched_query')}")
         item = ProgramItem(
             id=str(uuid.uuid4())[:8],
             kind=ItemKind.content,
@@ -151,6 +167,8 @@ class ChannelEngine:
             found = find_ad(ad_type, exclude_ids=self._active_ids() | {a.video_id for a in ads})
             if not found:
                 break
+            if found.get("is_repeat_last_resort"):
+                self.log("aviso: ad last-resort (sem novidade disponível)")
             dur = float(found.get("duration") or found.get("target_duration_sec") or 15)
             if dur > budget + 5:
                 break
@@ -259,9 +277,10 @@ class ChannelEngine:
             msg = self.affinity.record_view(cur.content_type, cur.watched_ratio, cur.watched_sec)
             self.log(msg)
 
+        played_at = _now()
         self.as_run.append(
             {
-                "at": _now(),
+                "at": played_at,
                 "video_id": cur.video_id,
                 "kind": cur.kind.value,
                 "title": cur.title,
@@ -273,6 +292,18 @@ class ChannelEngine:
             }
         )
         self.as_run = self.as_run[-100:]
+
+        if cur.video_id:
+            is_new = self.history.record(
+                video_id=cur.video_id,
+                title=cur.title,
+                kind=cur.kind.value,
+                content_type=cur.content_type,
+                ad_type=cur.ad_type,
+                played_at=played_at,
+            )
+            if is_new:
+                self.log(f"histórico +1 → {self.history.count()} vídeos únicos")
 
         self.cache.evict(cur)
         cur.status = ItemStatus.deleted

@@ -297,6 +297,18 @@ escolher candidato que caiba no cache e não tenha repetido recentemente
   - % da grade entregue por tipo vs % de afinidade (calibração)
 - Permitir reset manual dos pesos (“esquecer preferências”).
 
+### RF23 — Histórico anti-repetição de vídeos
+- O sistema deve manter um **histórico persistente** de todos os vídeos já usados/exibidos no canal (conteúdo e ads).
+- Persistência em disco sob `DATA_DIR` (ex.: `video_history.json` no volume Railway `/data`), sobrevivendo a restart/redeploy.
+- Cada registro contém no mínimo: `video_id`; idealmente também `title`, `kind` (`content` | `ad`), `content_type` / `ad_type`, `played_at`.
+- Source Manager / `find_content` / `find_ad` / engine **excluem** IDs já vistos ao escolher o próximo item.
+- Política quando a busca não acha novidade (nessa ordem; **nunca preferir repetir** se houver alternativa):
+  1. expandir a busca (mais queries / maior `limit` do tipo pedido)
+  2. tentar outro tipo (conteúdo alternativo ou ad coringa `generic_brand` / `promo_house`)
+  3. seed/fallback ainda **inédito**
+  4. só então last-resort com vídeo já visto (para não furar o ar) — deve ser logado como `is_repeat_last_resort`
+- Expor `history_count` em `/api/state` (e no painel operacional) para observar o crescimento do histórico.
+
 ### RF21 — Logo do canal
 - Deve existir asset oficial de logo do canal no repositório (`assets/logo.jpg`).
 - Nome de marca na UI: **frapfel TV** (canal de futebol brasileiro).

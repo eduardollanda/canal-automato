@@ -57,3 +57,4 @@ class EngineSnapshot(BaseModel):
     algorithm_log: list[str] = Field(default_factory=list)
     content_since_break: int = 0
     status: str = "starting"
+    history_count: int = 0

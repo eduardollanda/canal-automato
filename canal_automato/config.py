@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", ROOT / "data"))
 CACHE_DIR = Path(os.getenv("CACHE_DIR", DATA_DIR / "cache"))
 STATE_PATH = Path(os.getenv("STATE_PATH", DATA_DIR / "state.json"))
+HISTORY_PATH = Path(os.getenv("HISTORY_PATH", DATA_DIR / "video_history.json"))
 ASSETS_DIR = ROOT / "assets"
 LOGO_PATH = ASSETS_DIR / "logo.jpg"
 

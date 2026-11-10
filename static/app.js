@@ -146,6 +146,7 @@ async function refreshState(forcePlay = false) {
 
   document.getElementById("cacheStat").textContent = `${state.cache_pct}% de 2GB`;
   document.getElementById("statusStat").textContent = state.status;
+  document.getElementById("historyStat").textContent = `${state.history_count ?? 0} vídeos`;
 
   if (cur) {
     const badge = document.getElementById("kindBadge");
